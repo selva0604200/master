@@ -1211,32 +1211,7 @@ addEventListener('resize',resize);resize();animate();
 })();
 </script>
 
-<script>
-(function () {
-    const video = document.getElementById('background-video');
-    if (!video) return;
 
-    video.muted = true;
-    video.defaultMuted = true;
-    video.playsInline = true;
-
-    const startVideo = () => {
-        const promise = video.play();
-        if (promise && typeof promise.catch === 'function') {
-            promise.catch(() => {
-                // Browsers may delay autoplay until the first user interaction.
-            });
-        }
-    };
-
-    video.addEventListener('loadeddata', startVideo, { once: true });
-    video.addEventListener('canplay', startVideo, { once: true });
-    window.addEventListener('load', startVideo, { once: true });
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && video.paused) startVideo();
-    });
-})();
-</script>
 
 
 <script>
@@ -1244,63 +1219,42 @@ addEventListener('resize',resize);resize();animate();
     const video = document.getElementById('background-video');
     if (!video) return;
 
+    video.autoplay = false;
+    video.loop = false;
+    video.pause();
+
     let duration = 0;
     let targetTime = 0;
-    let currentTime = 0;
-    let ticking = false;
-
-    const getScrollProgress = () => {
-        const maxScroll = Math.max(
-            1,
-            document.documentElement.scrollHeight - window.innerHeight
-        );
-        return Math.min(1, Math.max(0, window.scrollY / maxScroll));
-    };
-
-    const updateTarget = () => {
-        if (!duration || !Number.isFinite(duration)) return;
-        targetTime = getScrollProgress() * Math.max(0, duration - 0.05);
-        if (!ticking) {
-            ticking = true;
-            requestAnimationFrame(animate);
-        }
-    };
-
-    const animate = () => {
-        const difference = targetTime - currentTime;
-        currentTime += difference * 0.12;
-
-        if (Math.abs(difference) < 0.001) {
-            currentTime = targetTime;
-            ticking = false;
-        } else {
-            requestAnimationFrame(animate);
-        }
-
-        if (Math.abs(video.currentTime - currentTime) > 0.01) {
-            video.currentTime = currentTime;
-        }
-    };
+    let raf = 0;
 
     video.addEventListener('loadedmetadata', () => {
-        duration = video.duration;
-        currentTime = 0;
+        duration = Number.isFinite(video.duration) ? video.duration : 0;
         video.currentTime = 0;
-        updateTarget();
     });
 
-    video.addEventListener('durationchange', () => {
-        if (!duration && Number.isFinite(video.duration)) {
-            duration = video.duration;
-            updateTarget();
+    function syncToScroll() {
+        if (!duration) return;
+        const maxScroll = Math.max(1, document.documentElement.scrollHeight - innerHeight);
+        const progress = Math.max(0, Math.min(1, scrollY / maxScroll));
+        targetTime = progress * Math.max(0, duration - 0.05);
+        if (!raf) raf = requestAnimationFrame(updateFrame);
+    }
+
+    function updateFrame() {
+        const difference = targetTime - video.currentTime;
+        if (Math.abs(difference) > 0.004) {
+            video.currentTime += difference * 0.28;
+            raf = requestAnimationFrame(updateFrame);
+        } else {
+            video.currentTime = targetTime;
+            raf = 0;
         }
-    });
+    }
 
-    window.addEventListener('scroll', updateTarget, { passive: true });
-    window.addEventListener('resize', updateTarget);
-
-    // Keep the video paused: scroll position is the only controller.
-    video.pause();
+    addEventListener('scroll', syncToScroll, { passive: true });
+    addEventListener('resize', syncToScroll);
+    video.addEventListener('play', () => video.pause());
+    syncToScroll();
 })();
 </script>
 
