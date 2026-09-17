@@ -508,9 +508,7 @@
     </style>
 </head>
 <body>
-    <video id="background-video" muted playsinline preload="auto" aria-hidden="true">
-        <source src="airport_scroll.mp4" type="video/mp4">
-    </video>
+    <canvas id="background-video" aria-hidden="true"></canvas>
     <div class="video-overlay" aria-hidden="true"></div>
     <div class="base-black"></div>
     <div class="noise-overlay"></div>
@@ -1189,67 +1187,16 @@ addEventListener('resize',resize);resize();animate();
 
 <script>
 (() => {
-  const video = document.getElementById('background-video');
-  if (!video) return;
-
-  video.pause();
-  video.autoplay = false;
-  video.loop = false;
-  video.muted = true;
-  video.playsInline = true;
-  video.preload = 'auto';
-
-  let duration = 0;
-  let target = 0;
-  let displayed = 0;
-  let raf = 0;
-  let lastTime = -1;
-
-  const clamp = (n,a,b) => Math.min(Math.max(n,a),b);
-
-  function getProgress() {
-    const max = Math.max(document.documentElement.scrollHeight - innerHeight, 1);
-    return clamp(scrollY / max, 0, 1);
-  }
-
-  function render() {
-    raf = 0;
-    if (!duration || !Number.isFinite(duration)) return;
-
-    // Smoothly interpolate toward the scroll position instead of jumping
-    // directly to every scroll event.
-    displayed += (target - displayed) * 0.12;
-
-    const time = displayed * Math.max(0, duration - 0.05);
-    if (Math.abs(time - lastTime) > 0.004 && video.readyState >= 2) {
-      lastTime = time;
-      video.currentTime = time;
-    }
-
-    if (Math.abs(target - displayed) > 0.0001) {
-      raf = requestAnimationFrame(render);
-    }
-  }
-
-  function update() {
-    target = getProgress();
-    if (!raf) raf = requestAnimationFrame(render);
-  }
-
-  video.addEventListener('loadedmetadata', () => {
-    duration = video.duration;
-    target = getProgress();
-    displayed = target;
-    video.currentTime = target * Math.max(0, duration - 0.05);
-  }, { once: true });
-
-  addEventListener('scroll', update, { passive: true });
-  addEventListener('resize', update, { passive: true });
-
-  if (video.readyState >= 1) {
-    duration = video.duration || 0;
-    update();
-  }
+  const canvas=document.getElementById('background-video'); if(!canvas)return;
+  const ctx=canvas.getContext('2d',{alpha:false,desynchronized:true});
+  const count=313, images=new Array(count); let target=0,current=0,raf=0,last=-1;
+  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+  function resize(){const d=Math.min(devicePixelRatio||1,2);canvas.width=innerWidth*d;canvas.height=innerHeight*d;canvas.style.width='100vw';canvas.style.height='100vh';draw(Math.round(current));}
+  function draw(i){i=clamp(i,0,count-1);const im=images[i];if(!im)return;const cw=canvas.width,ch=canvas.height,sc=Math.max(cw/im.width,ch/im.height),w=im.width*sc,h=im.height*sc;ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(im,(cw-w)/2,(ch-h)/2,w,h);}
+  function tick(){current+=(target-current)*.22;const i=Math.round(current);if(i!==last){draw(i);last=i;}if(Math.abs(target-current)>.02)raf=requestAnimationFrame(tick);else raf=0;}
+  function update(){const max=Math.max(document.documentElement.scrollHeight-innerHeight,1);target=clamp(scrollY/max,0,1)*(count-1);if(!raf)raf=requestAnimationFrame(tick);}
+  for(let i=0;i<count;i++){const im=new Image();im.decoding='async';im.src='airport_frames/frame_'+String(i+1).padStart(4,'0')+'.jpg';im.onload=()=>{images[i]=im;if(i===0)draw(0);};}
+  addEventListener('resize',resize,{passive:true});addEventListener('scroll',update,{passive:true});resize();update();
 })();
 </script>
 
