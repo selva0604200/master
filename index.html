@@ -1219,42 +1219,66 @@ addEventListener('resize',resize);resize();animate();
     const video = document.getElementById('background-video');
     if (!video) return;
 
+    // Hard-disable normal video playback.
+    video.removeAttribute('autoplay');
+    video.removeAttribute('loop');
     video.autoplay = false;
     video.loop = false;
+    video.controls = false;
     video.pause();
 
     let duration = 0;
     let targetTime = 0;
     let raf = 0;
+    let seeking = false;
 
-    video.addEventListener('loadedmetadata', () => {
-        duration = Number.isFinite(video.duration) ? video.duration : 0;
-        video.currentTime = 0;
-    });
+    const stopPlayback = () => {
+        if (!video.paused) video.pause();
+    };
 
-    function syncToScroll() {
-        if (!duration) return;
-        const maxScroll = Math.max(1, document.documentElement.scrollHeight - innerHeight);
-        const progress = Math.max(0, Math.min(1, scrollY / maxScroll));
+    video.addEventListener('play', stopPlayback);
+    video.addEventListener('playing', stopPlayback);
+    video.addEventListener('timeupdate', stopPlayback);
+    video.addEventListener('loadeddata', stopPlayback);
+    video.addEventListener('canplay', stopPlayback);
+
+    function setScrollFrame() {
+        if (!duration || seeking) return;
+        const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+        const progress = Math.max(0, Math.min(1, window.scrollY / maxScroll));
         targetTime = progress * Math.max(0, duration - 0.05);
         if (!raf) raf = requestAnimationFrame(updateFrame);
     }
 
     function updateFrame() {
+        seeking = true;
         const difference = targetTime - video.currentTime;
         if (Math.abs(difference) > 0.004) {
             video.currentTime += difference * 0.28;
+            video.pause();
+            seeking = false;
             raf = requestAnimationFrame(updateFrame);
         } else {
             video.currentTime = targetTime;
+            video.pause();
+            seeking = false;
             raf = 0;
         }
     }
 
-    addEventListener('scroll', syncToScroll, { passive: true });
-    addEventListener('resize', syncToScroll);
-    video.addEventListener('play', () => video.pause());
-    syncToScroll();
+    video.addEventListener('loadedmetadata', () => {
+        duration = Number.isFinite(video.duration) ? video.duration : 0;
+        video.pause();
+        video.currentTime = 0;
+        setScrollFrame();
+    });
+
+    window.addEventListener('scroll', setScrollFrame, { passive: true });
+    window.addEventListener('resize', setScrollFrame);
+
+    // Stop accidental playback from browser restore/cache behavior.
+    window.addEventListener('pageshow', stopPlayback);
+    document.addEventListener('visibilitychange', stopPlayback);
 })();
 </script>
 
