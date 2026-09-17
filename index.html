@@ -1192,66 +1192,62 @@ addEventListener('resize',resize);resize();animate();
     const video = document.getElementById('background-video');
     if (!video) return;
 
-    // Hard-disable normal video playback.
-    video.removeAttribute('autoplay');
-    video.removeAttribute('loop');
-    video.autoplay = false;
-    video.loop = false;
-    video.controls = false;
+    // Scroll-controlled cinematic scrubbing: the video advances frame-by-frame
+    // according to page position instead of playing independently.
     video.pause();
+    video.loop = false;
+    video.autoplay = false;
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
 
     let duration = 0;
     let targetTime = 0;
-    let raf = 0;
+    let displayedTime = -1;
     let seeking = false;
+    let pending = false;
 
-    const stopPlayback = () => {
-        if (!video.paused) video.pause();
-    };
-
-    video.addEventListener('play', stopPlayback);
-    video.addEventListener('playing', stopPlayback);
-    video.addEventListener('timeupdate', stopPlayback);
-    video.addEventListener('loadeddata', stopPlayback);
-    video.addEventListener('canplay', stopPlayback);
-
-    function setScrollFrame() {
-        if (!duration || seeking) return;
-        const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-        const progress = Math.max(0, Math.min(1, window.scrollY / maxScroll));
-        targetTime = progress * Math.max(0, duration - 0.05);
-        if (!raf) raf = requestAnimationFrame(updateFrame);
+    function getProgress() {
+        const max = Math.max(document.documentElement.scrollHeight - innerHeight, 1);
+        return Math.min(Math.max(scrollY / max, 0), 1);
     }
 
-    function updateFrame() {
-        seeking = true;
-        const difference = targetTime - video.currentTime;
-        if (Math.abs(difference) > 0.004) {
-            video.currentTime += difference * 0.28;
-            video.pause();
-            seeking = false;
-            raf = requestAnimationFrame(updateFrame);
-        } else {
+    function requestFrame() {
+        if (!duration) return;
+        targetTime = getProgress() * Math.max(0, duration - 0.05);
+        if (!seeking && Math.abs(targetTime - displayedTime) > 0.001) {
+            seeking = true;
             video.currentTime = targetTime;
-            video.pause();
-            seeking = false;
-            raf = 0;
+        } else {
+            pending = true;
         }
     }
 
     video.addEventListener('loadedmetadata', () => {
-        duration = Number.isFinite(video.duration) ? video.duration : 0;
-        video.pause();
-        video.currentTime = 0;
-        setScrollFrame();
+        duration = video.duration || 0;
+        requestFrame();
     });
 
-    window.addEventListener('scroll', setScrollFrame, { passive: true });
-    window.addEventListener('resize', setScrollFrame);
+    video.addEventListener('seeked', () => {
+        displayedTime = video.currentTime;
+        seeking = false;
+        if (pending || Math.abs(targetTime - displayedTime) > 0.001) {
+            pending = false;
+            requestFrame();
+        }
+    });
 
-    // Stop accidental playback from browser restore/cache behavior.
-    window.addEventListener('pageshow', stopPlayback);
-    document.addEventListener('visibilitychange', stopPlayback);
+    let raf = 0;
+    addEventListener('scroll', () => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(requestFrame);
+    }, { passive: true });
+
+    addEventListener('resize', requestFrame, { passive: true });
+    if (video.readyState >= 1) {
+        duration = video.duration || 0;
+        requestFrame();
+    }
 })();
 </script>
 
