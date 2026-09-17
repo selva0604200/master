@@ -488,6 +488,7 @@
             z-index: 0;
             pointer-events: none;
             background: #000;
+            display: block;
         }
 
         .video-overlay {
@@ -513,7 +514,9 @@
 <body>
     <div id="s-reveal" aria-hidden="true"><canvas id="s-reveal-canvas"></canvas></div>
 
-    <video id="background-video" autoplay muted loop playsinline preload="auto" aria-hidden="true"><source src="Plane window (1).mp4" type="video/mp4"></video>
+    <video id="background-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
+        <source src="airport.mp4" type="video/mp4">
+    </video>
     <div class="video-overlay" aria-hidden="true"></div>
     <div class="base-black"></div>
     <div class="noise-overlay"></div>
@@ -1207,5 +1210,33 @@ addEventListener('resize',resize);resize();animate();
   addEventListener('resize',resize);resize();init();if(reduce)overlay.classList.add('done');else requestAnimationFrame(frame);
 })();
 </script>
+
+<script>
+(function () {
+    const video = document.getElementById('background-video');
+    if (!video) return;
+
+    video.muted = true;
+    video.defaultMuted = true;
+    video.playsInline = true;
+
+    const startVideo = () => {
+        const promise = video.play();
+        if (promise && typeof promise.catch === 'function') {
+            promise.catch(() => {
+                // Browsers may delay autoplay until the first user interaction.
+            });
+        }
+    };
+
+    video.addEventListener('loadeddata', startVideo, { once: true });
+    video.addEventListener('canplay', startVideo, { once: true });
+    window.addEventListener('load', startVideo, { once: true });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && video.paused) startVideo();
+    });
+})();
+</script>
+
 </body>
 </html>
