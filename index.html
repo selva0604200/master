@@ -514,7 +514,7 @@
 <body>
     <div id="s-reveal" aria-hidden="true"><canvas id="s-reveal-canvas"></canvas></div>
 
-    <video id="background-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
+    <video id="background-video" muted playsinline preload="auto" aria-hidden="true">
         <source src="airport.mp4" type="video/mp4">
     </video>
     <div class="video-overlay" aria-hidden="true"></div>
@@ -1235,6 +1235,72 @@ addEventListener('resize',resize);resize();animate();
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden && video.paused) startVideo();
     });
+})();
+</script>
+
+
+<script>
+(() => {
+    const video = document.getElementById('background-video');
+    if (!video) return;
+
+    let duration = 0;
+    let targetTime = 0;
+    let currentTime = 0;
+    let ticking = false;
+
+    const getScrollProgress = () => {
+        const maxScroll = Math.max(
+            1,
+            document.documentElement.scrollHeight - window.innerHeight
+        );
+        return Math.min(1, Math.max(0, window.scrollY / maxScroll));
+    };
+
+    const updateTarget = () => {
+        if (!duration || !Number.isFinite(duration)) return;
+        targetTime = getScrollProgress() * Math.max(0, duration - 0.05);
+        if (!ticking) {
+            ticking = true;
+            requestAnimationFrame(animate);
+        }
+    };
+
+    const animate = () => {
+        const difference = targetTime - currentTime;
+        currentTime += difference * 0.12;
+
+        if (Math.abs(difference) < 0.001) {
+            currentTime = targetTime;
+            ticking = false;
+        } else {
+            requestAnimationFrame(animate);
+        }
+
+        if (Math.abs(video.currentTime - currentTime) > 0.01) {
+            video.currentTime = currentTime;
+        }
+    };
+
+    video.addEventListener('loadedmetadata', () => {
+        duration = video.duration;
+        currentTime = 0;
+        video.currentTime = 0;
+        updateTarget();
+    });
+
+    video.addEventListener('durationchange', () => {
+        if (!duration && Number.isFinite(video.duration)) {
+            duration = video.duration;
+            updateTarget();
+        }
+    });
+
+    window.addEventListener('scroll', updateTarget, { passive: true });
+    window.addEventListener('resize', updateTarget);
+
+    // Keep the video paused: scroll position is the only controller.
+    video.pause();
 })();
 </script>
 
